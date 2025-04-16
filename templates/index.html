@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>GST Analysis Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: rgb(138, 198, 152)
+      background-size: cover;
+      color: black;
+      min-height: 100vh;
+    }
+
+    nav {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      justify-content: space-between;   
+      align-items: center;
+      padding: 15px 30px;
+      position: fixed;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+    }
+
+    .logo img {
+      width: 40px;
+      margin-right: 10px;
+    }
+
+    .logo-name {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .nav-links a {
+      color: white;
+      text-decoration: none;
+      margin-left: 20px;
+      font-weight: bold;
+      transition: color 0.3s;
+    }
+
+    .nav-links a:hover {
+      color: #ff6347;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: auto;
+      padding: 120px 20px 40px; /* top padding accounts for fixed nav */
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 2.8rem;
+      margin-bottom: 50px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+
+    .cards-container {
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+
+    .card {
+      display: flex;
+      background: rgba(52, 50, 50, 0.1);
+      border-radius: 20px;
+      box-shadow: 0 4px 15px rgba(2, 2, 2, 0.3);
+      overflow: hidden;
+      transition: transform 0.3s ease;
+      flex-wrap: wrap;
+    }
+
+    .card:hover {
+      transform: scale(1.02);
+    }
+
+    .card-img {
+      flex: 1;
+      min-width: 150px;
+      background: rgba(221, 208, 208, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .card-img img {
+      width: 100px;
+      height: 100px;
+    }
+
+    .card-content {
+      flex: 3;
+      padding: 25px;
+      min-width: 250px;
+    }
+
+    .card-content h2 {
+      margin-bottom: 10px;
+      color:rgb(255, 7, 7);
+    }
+
+    .card-content p {
+      margin-bottom: 20px;
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+
+    .card-content a {
+      display: inline-block;
+      padding: 10px 20px;
+      background: #ff6347;
+      color: white;
+      text-decoration: none;
+      border-radius: 10px;
+      transition: background 0.3s ease;
+    }
+
+    .card-content a:hover {
+      background: #e53e2f;
+    }
+
+    footer {
+      text-align: center;
+      padding: 30px;
+      margin-top: 60px;
+      background: rgba(0, 0, 0, 0.6);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 768px) {
+      .card {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .card-content {
+        text-align: center;
+      }
+
+      .nav-links {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <nav>
+    <div class="logo">
+      <img src="https://cdn-icons-png.flaticon.com/512/3159/3159066.png" alt="Logo">
+      <div class="logo-name">GST Insights</div>
+    </div>
+    <div class="nav-links">
+      <a href="#">Home</a>
+      <a href="/fraudulent">Detection</a>
+      <a href="/forecasting">Forecast</a>
+      <a href="/about">About</a>
+      <a href="/contact">Contact</a>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="container">
+    <h1>Welcome to the GST Analysis Portal</h1>
+    
+    <div class="cards-container">
+
+      <div class="card">
+        <div class="card-img">
+          <img src="https://cdn-icons-png.flaticon.com/512/2115/2115910.png" alt="Fraud Detection">
+        </div>
+        <div class="card-content">
+          <h2>GST Fraud Detection</h2>
+          <p>
+            GST Fraudulent Detection uses data analytics and machine learning to identify suspicious activities in tax filings.  
+            It helps uncover fake invoices, bogus ITC claims, and other tax evasion tactics.  
+            By automating fraud detection, authorities can ensure better compliance and faster investigations.  
+            This system plays a vital role in safeguarding government revenue and promoting fair trade practices.  
+        </p>
+        
+          <a href="/fraudulent">Explore Now!!!</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <img src="https://cdn-icons-png.flaticon.com/512/1828/1828911.png" alt="Forecasting">
+        </div>
+        <div class="card-content">
+          <h2>GST Tax Forecasting</h2>
+          <p>
+            GST Forecasting leverages historical tax data to predict future revenue trends.  
+            It helps policymakers make informed decisions on tax planning and economic strategies.  
+            Accurate forecasting ensures efficient budget allocation and resource management.  
+            This approach supports proactive governance and financial stability across sectors.  
+        </p>
+        
+          <a href="/forecasting">Forecast Now!!!</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <img src="https://cdn-icons-png.flaticon.com/512/847/847969.png" alt="Fraud Info">
+        </div>
+        <div class="card-content">
+          <h2>Fraudulent Info</h2>
+          <p>
+            The Fraudulent Info section provides detailed insights into common GST fraud techniques and patterns.  
+            It educates users about red flags such as invoice mismatches, shell companies, and tax evasion methods.  
+            Understanding these indicators helps businesses stay compliant and avoid penalties.  
+            This section aims to raise awareness and promote ethical financial practices.  
+        </p>
+        
+          <a href="/fraudulent-info">View Info</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <img src="https://cdn-icons-png.flaticon.com/512/3572/3572391.png" alt="Forecast Info">
+        </div>
+        <div class="card-content">
+          <h2>Forecasting Info</h2>
+          <p>
+            The Forecasting Info section offers a deeper look into how GST data is analyzed to predict future trends.  
+            It explains the techniques used, such as time series analysis and machine learning models.  
+            Users can explore how forecasting supports strategic planning and tax policy formulation.  
+            This section helps stakeholders understand the importance of data-driven decision-making.  
+        </p>
+        
+          <a href="/forecasting-info">Learn More</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="About">
+        </div>
+        <div class="card-content">
+          <h2>About This Project</h2>
+          <p>
+            This project is designed to analyze GST data using advanced technologies like Machine Learning and Data Analytics.  
+            It features modules for fraud detection and forecasting to assist in financial monitoring and planning.  
+            The goal is to improve transparency, compliance, and efficiency in the GST system.  
+            Built as a real-time application, it empowers users with insights for smarter decision-making.  
+        </p>
+        
+          <a href="/about">About Us</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    © 2025 GST Insights. All rights reserved. | Developed by Team GST Analytics
+  </footer>
+
+</body>
+</html>

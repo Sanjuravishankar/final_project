@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fraudulent Transaction Detection</title>
+    <style>
+        body {
+            background: linear-gradient(to right, #f8f9fa, #e3f2fd);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 30px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #d32f2f;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+        }
+
+        .file-upload {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: #0288d1;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0277bd;
+        }
+
+        .action-buttons {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .action-buttons form {
+            display: inline;
+            margin: 0 10px;
+        }
+
+        .result {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+            color: #444;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #4caf50;
+            color: white;
+        }
+
+        td span {
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        .error-message {
+            color: red;
+            text-align: center;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        .no-result {
+            font-style: italic;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🚨 Fraudulent Transaction Detection</h1>
+
+        <div class="file-upload">
+            <form action="/fraudulent" method="POST" enctype="multipart/form-data">
+                <input type="file" name="file" accept=".csv, .xlsx" required>
+                <br>
+                <button type="submit">📤 Upload File</button>
+            </form>
+        </div>
+
+        {% if error %}
+            <div class="error-message">
+                <p>{{ error }}</p>
+            </div>
+        {% endif %}
+
+        {% if fraud_count is not none %}
+            <div class="result">
+                <h2>🔎 Total Fraudulent Transactions: <span style="color: red;">{{ fraud_count }}</span></h2>
+
+            
+
+                <div class="action-buttons">
+                    <form action="/download" method="GET">
+                        <button type="submit">📥 Download Report</button>
+                    </form>
+                
+                    <form action="/generate-report" method="POST">
+                        <button type="submit">📝 Generate Report</button>
+                    </form>
+                
+                    <form action="/analysis" method="GET">
+                        <button type="submit">📊 View Analysis</button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if result %}
+            <div class="result">
+                <h2 style="color: #d32f2f;">⚠️ Fraudulent Transactions Found:</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>GSTIN</th>
+                            <th>Business Name</th>
+                            <th>Invoice Number</th>
+                            <th>Invoice Amount</th>
+                            <th>ITC Claimed</th>
+                            <th>Output Tax Payable</th>
+                            <th>Net Tax Paid</th>
+                            <th>GSTR-1 Filed</th>
+                            <th>GSTR-3B Filed</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in result %}
+                            <tr>
+                                <td>{{ row['GSTIN'] }}</td>
+                                <td>{{ row['Business Name'] }}</td>
+                                <td>{{ row['Invoice Number'] }}</td>
+                                <td>{{ row['Invoice Amount'] }}</td>
+                                <td>{{ row['Input Tax Credit (ITC) Claimed'] }}</td>
+                                <td>{{ row['Output Tax Payable'] }}</td>
+                                <td>{{ row['Net Tax Paid'] }}</td>
+                                <td>{{ row['GSTR-1 Filed Date'] }}</td>
+                                <td>{{ row['GSTR-3B Filed Date'] }}</td>
+                                <td>
+                                    {% if row['Fraud Status'] == 'Fraudulent' %}
+                                        <span style="color: red;">{{ row['Fraud Status'] }}</span>
+                                    {% else %}
+                                        <span style="color: green;">{{ row['Fraud Status'] }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="result no-result">
+                <p>No fraudulent transactions found in the uploaded file.</p>
+            </div>
+        {% endif %}
+
+    </div>
+
+</body>
+</html>
