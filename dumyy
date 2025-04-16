@@ -1,0 +1,647 @@
+from flask import Flask, request, render_template, redirect, url_for, session
+import pickle
+import pandas as pd
+import os
+from dotenv import load_dotenv
+
+# Initialize Flask app
+app = Flask(__name__)
+
+# Load environment variables
+load_dotenv()
+app.secret_key = os.getenv("SECRET_KEY", "default_secret_key")  # Fallback key
+
+# Load ML model and feature columns
+try:
+    with open("gst_forecast_model.pkl", "rb") as model_file:
+        model = pickle.load(model_file)
+    with open("columns.pkl", "rb") as columns_file:
+        feature_columns = pickle.load(columns_file)
+except Exception as e:
+    print("Error loading model or columns:", e)
+    model = None
+    feature_columns = []
+
+# Dummy credentials (use proper authentication in production)
+users = {
+    "admin": "password123"
+}
+
+# Routes
+@app.route("/", methods=["GET", "POST"])
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        if users.get(username) == password:
+            session["user"] = username
+            return redirect(url_for("fraudulent"))
+        else:
+            return render_template("login.html", error="Invalid credentials.")
+
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.pop("user", None)
+    return redirect(url_for("login"))
+
+@app.route("/index")
+def index():
+    return render_template("index.html")
+
+@app.route("/forecasting", methods=["GET", "POST"])
+def forecasting():
+    if request.method == "POST":
+        try:
+            # Collect input data
+            input_data = pd.DataFrame([{
+                "SalesAmount": float(request.form.get("sales_amount", 0)),
+                "PurchaseAmount": float(request.form.get("purchase_amount", 0)),
+                "TaxSlab": float(request.form.get("tax_slab", 0)),
+                "InflationRate": float(request.form.get("inflation_rate", 0)),
+                "ProfitMargin": float(request.form.get("profit_margin", 0)),
+                "CapitalExpenditure": float(request.form.get("capital_expenditure", 0)),
+                "RevenueGrowth": float(request.form.get("revenue_growth", 0)),
+                "InterestRate": float(request.form.get("interest_rate", 0)),
+                "GDPGrowthRate": float(request.form.get("gdp_growth_rate", 0)),
+                "IndustryType": request.form.get("industry_type", "Manufacturing")
+            }])
+
+            input_data = input_data.reindex(columns=feature_columns, fill_value=0)
+            prediction = model.predict(input_data)[0]
+
+            return render_template("forecasting.html", prediction=prediction)
+
+        except Exception as e:
+            return render_template("forecasting.html", error=f"Error: {e}")
+
+    return render_template("forecasting.html")
+
+@app.route("/fraudulent", methods=["GET", "POST"])
+def fraudulent():
+    if request.method == "POST":
+        file = request.files.get("file")
+
+        if not file or file.filename == "":
+            return render_template("fraudulent.html", error="No file chosen.")
+
+        try:
+            uploads_folder = "uploads"
+            os.makedirs(uploads_folder, exist_ok=True)
+            file_path = os.path.join(uploads_folder, file.filename)
+            file.save(file_path)
+
+            if file.filename.endswith(".csv"):
+                df = pd.read_csv(file_path)
+            elif file.filename.endswith(".xlsx"):
+                df = pd.read_excel(file_path)
+            else:
+                return render_template("fraudulent.html", error="Unsupported file format.")
+
+            if df.empty:
+                return render_template("fraudulent.html", error="Uploaded file is empty.")
+
+            fraud_result = analyze_gst_fraud(df)
+            fraud_count = len(fraud_result)
+
+            return render_template("fraudulent.html", result=fraud_result.to_dict(orient="records"), fraud_count=fraud_count)
+
+        except Exception as e:
+            return render_template("fraudulent.html", error=f"Error processing file: {e}")
+
+    return render_template("fraudulent.html")
+
+def analyze_gst_fraud(df):
+    required_columns = [
+        "GSTIN", "Business Name", "PAN Number", "Business Type", "Industry Type",
+        "Invoice Number", "Invoice Date", "Invoice Amount", "Taxable Amount", "GST Rate (%)",
+        "CGST Amount", "SGST Amount", "IGST Amount", "Total GST Amount",
+        "Input Tax Credit (ITC) Claimed", "Output Tax Payable", "ITC Utilization",
+        "Net Tax Paid", "GSTR-1 Filed Date", "GSTR-3B Filed Date"
+    ]
+
+    missing = [col for col in required_columns if col not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns: {', '.join(missing)}")
+
+    fraud_conditions = (
+        (df["Input Tax Credit (ITC) Claimed"] > df["Output Tax Payable"]) |
+        df["GSTR-1 Filed Date"].isnull() |
+        df["GSTR-3B Filed Date"].isnull() |
+        (df["Total GST Amount"] != df["CGST Amount"] + df["SGST Amount"] + df["IGST Amount"])
+    )
+
+    df["Fraudulent"] = fraud_conditions.astype(int)
+    df["Fraud Status"] = df["Fraudulent"].map({1: "Fraudulent", 0: "Genuine"})
+
+    return df[df["Fraudulent"] == 1][[
+        "GSTIN", "Business Name", "Invoice Number", "Invoice Amount",
+        "Input Tax Credit (ITC) Claimed", "Output Tax Payable", "Net Tax Paid",
+        "GSTR-1 Filed Date", "GSTR-3B Filed Date", "Fraud Status"
+    ]]
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+
+
+
+{% comment %} <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GST Home</title>
+    <style>
+        <style>
+            * {
+                box-sizing: border-box;
+            }
+    
+            body {
+                margin: 0;
+                padding: 0;
+                height: 100vh;
+                background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                color: white;
+            }
+    
+            h1 {
+                margin-bottom: 30px;
+                font-size: 2.5rem;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            }
+    
+            .image-banner {
+                width: 100%;
+                max-height: 300px;
+                overflow: hidden;
+                margin-bottom: 40px;
+            }
+    
+            .image-banner img {
+                width: 100%;
+                height: auto;
+                display: block;
+                border-radius: 0 0 30px 30px;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            }
+    
+            .btn-container {
+                display: flex;
+                gap: 40px;
+                flex-wrap: wrap;
+            }
+    
+            .btn {
+                background: #ff6347;
+                padding: 20px 40px;
+                border: none;
+                border-radius: 15px;
+                font-size: 1.2em;
+                color: white;
+                text-decoration: none;
+                transition: all 0.3s ease-in-out;
+                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            }
+    
+            .btn:hover {
+                background-color: #e53e2f;
+                transform: translateY(-5px);
+            }
+    
+            .icon {
+                width: 20px;
+                height: 20px;
+                vertical-align: middle;
+                margin-right: 10px;
+            }
+        </style>
+</head>
+<body>
+    <div class="image-banner">
+        <img src="https://www.alankit.com/blog/blogimage/gstblog2.jpg" alt="GST Banner">
+    </div>
+    <h1>Welcome to GST Analysis Portal</h1>
+    
+    <div class="btn-container">
+        <a class="btn" href="/fraudulent">GST Fraud Detection</a>
+        <a class="btn" href="/forecasting">GST Forecasting</a>
+    </div>
+</body>
+</html>
+  {% endcomment %}
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GST Home</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .image-banner {
+            width: 100%;
+            max-height: 300px;
+            overflow: hidden;
+            margin-bottom: 40px;
+        }
+
+        .image-banner img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 0 0 30px 30px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        }
+
+        .btn-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            background: #ff6347;
+            padding: 20px 30px;
+            border: none;
+            border-radius: 15px;
+            font-size: 1.1em;
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s ease-in-out;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:hover {
+            background-color: #e53e2f;
+            transform: translateY(-5px);
+        }
+
+        .icon {
+            width: 20px;
+            height: 20px;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="image-banner">
+        <img src="https://www.alankit.com/blog/blogimage/gstblog2.jpg" alt="GST Banner">
+    </div>
+    <h1>Welcome to GST Analysis Portal</h1>
+    
+    <div class="btn-container">
+        <a class="btn" href="/fraudulent">GST Fraud Detection</a>
+        <a class="btn" href="/forecasting">GST Forecasting</a>
+        <a class="btn" href="/fraudulent-info">Fraudulent Info</a>
+        <a class="btn" href="/forecasting-info">Forecasting Info</a>
+        <a class="btn" href="/about">About</a>
+    </div>
+</body>
+</html>
+
+ 
+
+
+
+
+
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fraudulent Transaction Detection</title>
+
+    <style>
+        body {
+            background-color: #f0f8ff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 90%;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #ffffff;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #FF6347; /* Tomato */
+        }
+
+        .file-upload {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .file-upload input[type="file"] {
+            margin-bottom: 10px;
+        }
+
+        .result {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px;
+        }
+
+        td {
+            padding: 8px;
+            text-align: center;
+        }
+
+        td span {
+            font-weight: bold;
+        }
+
+        .error-message {
+            color: red;
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Fraudulent Transaction Detection</h1>
+
+        <div class="file-upload">
+            <form action="/fraudulent" method="POST" enctype="multipart/form-data">
+                <input type="file" name="file" accept=".csv, .xlsx" required>
+                <br>
+                <button type="submit">Upload</button>
+            </form>
+        </div>
+
+        {% if error %}
+            <div class="error-message">
+                <p>{{ error }}</p>
+            </div>
+        {% endif %}
+
+        {% if fraud_count is not none %}
+            <div class="result">
+                <h2>Total Fraudulent Transactions: {{ fraud_count }}</h2>
+            </div>
+        {% endif %}
+
+        {% if result %}
+            <div class="result">
+                <h2 style="color: red;">Fraudulent Transactions Found:</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>GSTIN</th>
+                            <th>Business Name</th>
+                            <th>Invoice Number</th>
+                            <th>Invoice Amount</th>
+                            <th>ITC Claimed</th>
+                            <th>Output Tax Payable</th>
+                            <th>Net Tax Paid</th>
+                            <th>GSTR-1 Filed Date</th>
+                            <th>GSTR-3B Filed Date</th>
+                            <th>Fraud Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in result %}
+                            <tr>
+                                <td>{{ row['GSTIN'] }}</td>
+                                <td>{{ row['Business Name'] }}</td>
+                                <td>{{ row['Invoice Number'] }}</td>
+                                <td>{{ row['Invoice Amount'] }}</td>
+                                <td>{{ row['Input Tax Credit (ITC) Claimed'] }}</td>
+                                <td>{{ row['Output Tax Payable'] }}</td>
+                                <td>{{ row['Net Tax Paid'] }}</td>
+                                <td>{{ row['GSTR-1 Filed Date'] }}</td>
+                                <td>{{ row['GSTR-3B Filed Date'] }}</td>
+                                <td>
+                                    {% if row['Fraud Status'] == 'Fraudulent' %}
+                                        <span style="color: red;">{{ row['Fraud Status'] }}</span>
+                                    {% else %}
+                                        <span style="color: green;">{{ row['Fraud Status'] }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="result">
+                <p>No fraudulent transactions found in the uploaded file.</p>
+            </div>
+        {% endif %}
+
+    </div>
+
+</body>
+</html>
+
+
+
+
+
+import os
+
+import pandas as pd
+from flask import Flask, render_template, request, redirect, url_for, session
+
+app = Flask(__name__)
+app.secret_key = 'f8d7a86c35c24dba92f9b32b4af2b9c1'  # Needed for session management
+
+# Dummy user (you can connect DB later)
+USER = {'username': 'admin', 'password': '1234'}
+
+@app.route('/')
+def index():
+    return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        if request.form['username'] == USER['username'] and request.form['password'] == USER['password']:
+            session['user'] = request.form['username']
+            return redirect(url_for('home'))
+        else:
+            error = 'Invalid Credentials'
+    return render_template('login.html', error=error)
+
+@app.route('/home')
+def home():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    return render_template('index.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('login'))
+
+
+@app.route("/forecasting", methods=["GET", "POST"])
+def forecasting():
+    if request.method == "POST":
+        try:
+            # Retrieve form data
+            input_data = pd.DataFrame([{
+                "SalesAmount": float(request.form.get("sales_amount", 0)),
+                "PurchaseAmount": float(request.form.get("purchase_amount", 0)),
+                "TaxSlab": float(request.form.get("tax_slab", 0)),
+                "InflationRate": float(request.form.get("inflation_rate", 0)),
+                "ProfitMargin": float(request.form.get("profit_margin", 0)),
+                "CapitalExpenditure": float(request.form.get("capital_expenditure", 0)),
+                "RevenueGrowth": float(request.form.get("revenue_growth", 0)),
+                "InterestRate": float(request.form.get("interest_rate", 0)),
+                "GDPGrowthRate": float(request.form.get("gdp_growth_rate", 0)),
+                "IndustryType": request.form.get("industry_type", "Manufacturing")
+            }])
+
+            input_data = input_data.reindex(columns=feature_columns, fill_value=0)
+
+            prediction = model.predict(input_data)[0]
+            return render_template("forecasting.html", prediction=prediction, error=None)
+        except Exception as e:
+            return render_template("forecasting.html", prediction=None, error=f"Error: {e}")
+
+    return render_template("forecasting.html", prediction=None, error=None)
+
+@app.route("/fraudulent", methods=["GET", "POST"])
+def fraudulent():
+    if request.method == "POST":
+        file = request.files.get("file")
+
+        if not file or file.filename == "":
+            return render_template("fraudulent.html", result=None, error="No file chosen. Please upload a valid file.", fraud_count=None)
+
+        try:
+            uploads_folder = "uploads"
+            os.makedirs(uploads_folder, exist_ok=True)
+            file_path = os.path.join(uploads_folder, file.filename)
+            file.save(file_path)
+
+            # Read uploaded file
+            if file.filename.endswith(".csv"):
+                df = pd.read_csv(file_path)
+            elif file.filename.endswith(".xlsx"):
+                df = pd.read_excel(file_path)
+            else:
+                return render_template("fraudulent.html", result=None, error="Unsupported file format.", fraud_count=None)
+
+            if df.empty:
+                return render_template("fraudulent.html", result=None, error="The uploaded file is empty.", fraud_count=None)
+
+            # Analyze fraud
+            fraud_result = analyze_gst_fraud(df)
+            fraud_count = len(fraud_result)
+
+            return render_template("fraudulent.html", result=fraud_result.to_dict(orient="records"), error=None, fraud_count=fraud_count)
+
+        except ValueError as ve:
+            return render_template("fraudulent.html", result=None, error=str(ve), fraud_count=None)
+        except Exception as e:
+            return render_template("fraudulent.html", result=None, error=f"Error processing file: {e}", fraud_count=None)
+
+    return render_template("fraudulent.html", result=None, error=None, fraud_count=None)
+
+def analyze_gst_fraud(df):
+    required_columns = [
+        "GSTIN", "Business Name", "PAN Number", "Business Type", "Industry Type",
+        "Invoice Number", "Invoice Date", "Invoice Amount", "Taxable Amount", "GST Rate (%)",
+        "CGST Amount", "SGST Amount", "IGST Amount", "Total GST Amount",
+        "Input Tax Credit (ITC) Claimed", "Output Tax Payable", "ITC Utilization",
+        "Net Tax Paid", "GSTR-1 Filed Date", "GSTR-3B Filed Date"
+    ]
+
+    missing = [col for col in required_columns if col not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns: {', '.join(missing)}")
+
+    # Define fraud logic
+    fraud_conditions = (
+        (df["Input Tax Credit (ITC) Claimed"] > df["Output Tax Payable"]) |
+        (df["GSTR-1 Filed Date"].isnull() | df["GSTR-3B Filed Date"].isnull()) |
+        (df["Total GST Amount"] != df["CGST Amount"] + df["SGST Amount"] + df["IGST Amount"])
+    )
+
+    df["Fraudulent"] = fraud_conditions.astype(int)
+    df["Fraud Status"] = df["Fraudulent"].map({1: "Fraudulent", 0: "Genuine"})
+
+    fraud_df = df[df["Fraudulent"] == 1]
+
+    return fraud_df[[
+        "GSTIN", "Business Name", "Invoice Number", "Invoice Amount",
+        "Input Tax Credit (ITC) Claimed", "Output Tax Payable", "Net Tax Paid",
+        "GSTR-1 Filed Date", "GSTR-3B Filed Date", "Fraud Status"
+    ]]
+@app.route("/fraudulent-info")
+def fraudulent_info():
+    return render_template("fraudulent_info.html")
+
+@app.route("/forecasting-info")
+def forecasting_info():
+    return render_template("forecasting_info.html")
+
+@app.route("/about")
+def about():
+    return render_template("about.html")
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
